@@ -65,7 +65,7 @@ class StretchDriverNode:
         self.robot_mode_rwlock.acquire_read()
 
         # set new mobile base velocities if available
-        if self.robot_mode == 'navigation': 
+        if self.robot_mode == 'navigation':
             time_since_last_twist = rospy.get_time() - self.last_twist_time
             if time_since_last_twist < self.timeout:
                 self.robot.base.set_velocity(self.linear_velocity_mps, self.angular_velocity_radps)
@@ -127,25 +127,10 @@ class StretchDriverNode:
         pimu_hardware_id = self.robot.pimu.board_info['hardware_id']
         invalid_reading = float('NaN')
         v = float(robot_status['pimu']['voltage'])
-        self.voltage_history.append(v)
-        if len(self.voltage_history) > 100:
-            self.voltage_history.pop(0)
-            self.charging_state_history.pop(0)
-            if v > np.mean(self.voltage_history) + 3 * np.std(self.voltage_history):
-                self.charging_state_history.append(BatteryState.POWER_SUPPLY_STATUS_CHARGING)
-            elif v < np.mean(self.voltage_history) - 3 * np.std(self.voltage_history):
-                self.charging_state_history.append(BatteryState.POWER_SUPPLY_STATUS_DISCHARGING)
-            else:
-                self.charging_state_history.append(BatteryState.POWER_SUPPLY_STATUS_UNKNOWN)
-        filtered_charging_state = max(set(self.charging_state_history), key=self.charging_state_history.count)
-        if filtered_charging_state != BatteryState.POWER_SUPPLY_STATUS_UNKNOWN:
-            if pimu_hardware_id == 0:
-                self.charging_state = filtered_charging_state
-            elif pimu_hardware_id == 1:
-                if robot_status['pimu']['charger_connected'] == True and filtered_charging_state == BatteryState.POWER_SUPPLY_STATUS_CHARGING:
-                    self.charging_state = BatteryState.POWER_SUPPLY_STATUS_CHARGING
-                elif robot_status['pimu']['charger_connected'] == False and filtered_charging_state == BatteryState.POWER_SUPPLY_STATUS_DISCHARGING:
-                    self.charging_state = BatteryState.POWER_SUPPLY_STATUS_DISCHARGING
+        if robot_status['pimu']['charger_connected']:
+            self.charging_state = BatteryState.POWER_SUPPLY_STATUS_CHARGING
+        elif not robot_status['pimu']['charger_connected']:
+            self.charging_state = BatteryState.POWER_SUPPLY_STATUS_DISCHARGING
 
         i = float(robot_status['pimu']['current'])
         if self.charging_state == BatteryState.POWER_SUPPLY_STATUS_CHARGING:
@@ -501,7 +486,7 @@ class StretchDriverNode:
         self.switch_to_position_mode_service = rospy.Service('/switch_to_position_mode',
                                                              Trigger,
                                                              self.position_mode_service_callback)
-        
+
         self.stop_the_robot_service = rospy.Service('/stop_the_robot',
                                                     Trigger,
                                                     self.stop_the_robot_callback)
